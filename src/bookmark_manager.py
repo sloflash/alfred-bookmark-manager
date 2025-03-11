@@ -89,8 +89,8 @@ class BookmarkManager:
         all_bookmarks = self.get_all_urls(bookmarks_json)
         logging.info(f"Total bookmarks found: {len(all_bookmarks)}")
 
-        # If query is empty or None, return all bookmarks
-        if not query:
+        # If query is empty, None, or just whitespace, return all bookmarks
+        if not query or query.strip() == '':
             return all_bookmarks
 
         # Check if query contains a path suffix
@@ -190,10 +190,32 @@ def main():
         }))
     
     elif action == 'create':
-        # Format: bms "url" folder/path "title"
-        cmd = ' '.join(sys.argv[2:])
-        params = parse_bookmark_command(cmd)
+        # Get command arguments
+        cmd = ' '.join(sys.argv[2:]) if len(sys.argv) > 2 else ''
         
+        # If no arguments provided, show open tabs
+        if not cmd:
+            tabs = bm_manager.get_open_tabs()
+            if not tabs:
+                print(json.dumps({"items": [{"title": "No open tabs found"}]}))
+            else:
+                print(json.dumps({
+                    "items": [
+                        {
+                            "title": t['title'],
+                            "subtitle": t['url'],
+                            "arg": t['url'],
+                            "text": {
+                                "copy": t['url'],
+                                "largetype": t['title']
+                            }
+                        } for t in tabs
+                    ]
+                }))
+            return
+
+        # Parse and create bookmark if arguments provided
+        params = parse_bookmark_command(cmd)
         if params:
             success = bm_manager.create_bookmark(
                 params['url'],
@@ -204,22 +226,6 @@ def main():
                 print(json.dumps({"items": [{"title": "Bookmark Created Successfully"}]}))
             else:
                 print(json.dumps({"items": [{"title": "Failed to Create Bookmark"}]}))
-        else:
-            # Show open tabs when no parameters provided
-            tabs = bm_manager.get_open_tabs()
-            print(json.dumps({
-                "items": [
-                    {
-                        "title": t['title'],
-                        "subtitle": t['url'],
-                        "arg": t['url'],
-                        "text": {
-                            "copy": t['url'],
-                            "largetype": t['title']
-                        }
-                    } for t in tabs
-                ]
-            }))
     
     elif action == 'debug_paths':
         paths = bm_manager.debug_bookmark_paths()
