@@ -22,7 +22,11 @@ def create_alfred_workflow():
 python3 bookmark_manager.py search "$1"'''
     
     bm_store_script = '''#!/bin/bash
-python3 bookmark_manager.py create "$@"'''
+if [ -z "$1" ]; then
+    python3 bookmark_manager.py tabs
+else
+    python3 bookmark_manager.py create "$@"
+fi'''
     
     # Write script filter files
     with open(os.path.join(build_dir, 'bm_search.sh'), 'w') as f:

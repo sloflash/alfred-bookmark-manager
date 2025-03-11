@@ -89,9 +89,9 @@ class BookmarkManager:
         all_bookmarks = self.get_all_urls(bookmarks_json)
         logging.info(f"Total bookmarks found: {len(all_bookmarks)}")
 
-        # If query is empty or None, return first 20 bookmarks
+        # If query is empty or None, return all bookmarks
         if not query:
-            return all_bookmarks[:20]
+            return all_bookmarks
 
         # Check if query contains a path suffix
         parts = query.split(' ', 1)
@@ -201,11 +201,25 @@ def main():
                 params['title']
             )
             if success:
-                print(json.dumps({"status": "success"}))
+                print(json.dumps({"items": [{"title": "Bookmark Created Successfully"}]}))
             else:
-                print(json.dumps({"status": "error"}))
+                print(json.dumps({"items": [{"title": "Failed to Create Bookmark"}]}))
         else:
-            print(json.dumps({"status": "invalid_command"}))
+            # Show open tabs when no parameters provided
+            tabs = bm_manager.get_open_tabs()
+            print(json.dumps({
+                "items": [
+                    {
+                        "title": t['title'],
+                        "subtitle": t['url'],
+                        "arg": t['url'],
+                        "text": {
+                            "copy": t['url'],
+                            "largetype": t['title']
+                        }
+                    } for t in tabs
+                ]
+            }))
     
     elif action == 'debug_paths':
         paths = bm_manager.debug_bookmark_paths()

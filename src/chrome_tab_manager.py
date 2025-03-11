@@ -6,19 +6,20 @@ import sqlite3
 import json
 import logging
 import time
+import glob
 from typing import List, Dict, Optional
 from pathlib import Path
 
 class ChromeTabManager:
     def __init__(self):
         self.user_dir = os.path.expanduser('~')
-        self.chrome_state_file = os.path.join(
+        self.chrome_state_dir = os.path.join(
             self.user_dir,
             'Library/Application Support/Google/Chrome/Default/Sessions'
         )
-        self.chrome_db = os.path.join(
+        self.chrome_snss_file = os.path.join(
             self.user_dir,
-            'Library/Application Support/Google/Chrome/Default/History'
+            'Library/Application Support/Google/Chrome/Default/Current Session'
         )
         
     def get_open_tabs(self) -> List[Dict[str, str]]:
@@ -26,50 +27,50 @@ class ChromeTabManager:
         Get all open Chrome tabs from the current session
         """
         try:
-            # Create a temporary copy of the History database since Chrome locks it
-            temp_db = "/tmp/chrome_history_temp"
+            # First try to get active tabs from Current Session
+            if os.path.exists(self.chrome_snss_file):
+                # Create a temporary copy since Chrome might lock the file
+                temp_file = "/tmp/chrome_session_temp"
+                os.system(f"cp '{self.chrome_snss_file}' '{temp_file}'")
+                
+                # Read the file in binary mode to find URLs
+                with open(temp_file, 'rb') as f:
+                    content = f.read()
+                os.remove(temp_file)
+                
+                # Extract URLs from binary content
+                tabs = []
+                # Split on http/https and try to extract URLs
+                parts = content.split(b'http')
+                for part in parts[1:]:  # Skip first part before http
+                    try:
+                        # Convert to string and find end of URL
+                        url_part = part.decode('utf-8', errors='ignore')
+                        url_end = url_part.find('\x00')
+                        if url_end > 0:
+                            url = 'http' + url_part[:url_end]
+                            if url.startswith('https://my.1password.com') or url.startswith('http://my.1password.com'):
+                                title = "1Password Sign In"
+                            else:
+                                title = url.split('/')[-1] or url
+                            tabs.append({
+                                'title': title,
+                                'url': url,
+                                'source': 'chrome_tab'
+                            })
+                    except Exception as e:
+                        logging.error(f"Error parsing URL: {e}")
+                        continue
+                
+                # Log the results for debugging
+                logging.info(f"Found {len(tabs)} open tabs")
+                for tab in tabs:
+                    logging.info(f"Tab: {tab['title']} - {tab['url']}")
+                
+                return tabs
             
-            # Wait for a moment if Chrome is actively writing
-            time.sleep(0.5)
-            
-            # Copy the database with system command
-            os.system(f"cp '{self.chrome_db}' '{temp_db}'")
-            
-            conn = sqlite3.connect(temp_db)
-            cursor = conn.cursor()
-            
-            # Query for the most recently accessed tabs
-            cursor.execute("""
-                SELECT urls.url, urls.title 
-                FROM urls 
-                JOIN visits ON urls.id = visits.url 
-                WHERE visits.visit_time > (
-                    SELECT MAX(visit_time) - 3600000000 FROM visits
-                )
-                AND urls.title != ''
-                GROUP BY urls.url 
-                ORDER BY MAX(visits.visit_time) DESC 
-                LIMIT 20
-            """)
-            
-            tabs = []
-            for url, title in cursor.fetchall():
-                if url and title:  # Filter out empty entries
-                    tabs.append({
-                        'title': title,
-                        'url': url,
-                        'source': 'chrome_tab'
-                    })
-            
-            conn.close()
-            os.remove(temp_db)
-            
-            # Log the results for debugging
-            logging.info(f"Found {len(tabs)} open tabs")
-            for tab in tabs:
-                logging.info(f"Tab: {tab['title']} - {tab['url']}")
-            
-            return tabs
+            logging.error("No Current Session file found")
+            return []
             
         except Exception as e:
             logging.error(f"Error getting open tabs: {e}")
