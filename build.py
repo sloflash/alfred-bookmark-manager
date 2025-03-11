@@ -15,18 +15,27 @@ def create_alfred_workflow():
     
     # Copy necessary files
     shutil.copy('src/bookmark_manager.py', build_dir)
+    shutil.copy('src/chrome_tab_manager.py', build_dir)
     
-    # Create Alfred script filter
-    bm_script = '''#!/bin/bash
+    # Create Alfred script filters
+    bm_search_script = '''#!/bin/bash
 python3 bookmark_manager.py search "$1"'''
     
-    # Write script filter file
+    bm_store_script = '''#!/bin/bash
+python3 bookmark_manager.py create "$@"'''
+    
+    # Write script filter files
     with open(os.path.join(build_dir, 'bm_search.sh'), 'w') as f:
-        f.write(bm_script)
+        f.write(bm_search_script)
     os.chmod(os.path.join(build_dir, 'bm_search.sh'), 0o755)
     
+    with open(os.path.join(build_dir, 'bm_store.sh'), 'w') as f:
+        f.write(bm_store_script)
+    os.chmod(os.path.join(build_dir, 'bm_store.sh'), 0o755)
+    
     # Generate unique IDs for workflow elements
-    script_filter_uid = str(uuid.uuid4())
+    search_filter_uid = str(uuid.uuid4())
+    store_filter_uid = str(uuid.uuid4())
     browser_uid = str(uuid.uuid4())
     
     # Create info.plist with Alfred configuration
@@ -53,11 +62,24 @@ python3 bookmark_manager.py search "$1"'''
                 <false/>
             </dict>
         </array>
+        <key>%s</key>
+        <array>
+            <dict>
+                <key>destinationuid</key>
+                <string>%s</string>
+                <key>modifiers</key>
+                <integer>0</integer>
+                <key>modifiersubtext</key>
+                <string></string>
+                <key>vitoclose</key>
+                <false/>
+            </dict>
+        </array>
     </dict>
     <key>createdby</key>
     <string>Mayank Ketkar</string>
     <key>description</key>
-    <string>Search Chrome bookmarks</string>
+    <string>Manage Chrome bookmarks and tabs</string>
     <key>disabled</key>
     <false/>
     <key>name</key>
@@ -102,6 +124,41 @@ python3 bookmark_manager.py search "$1"'''
         <dict>
             <key>config</key>
             <dict>
+                <key>alfredfiltersresults</key>
+                <false/>
+                <key>argumenttype</key>
+                <integer>0</integer>
+                <key>escaping</key>
+                <integer>102</integer>
+                <key>keyword</key>
+                <string>bms</string>
+                <key>queuedelay</key>
+                <integer>3</integer>
+                <key>runningsubtext</key>
+                <string>Getting open tabs...</string>
+                <key>script</key>
+                <string>./bm_store.sh "{query}"</string>
+                <key>scriptargtype</key>
+                <integer>0</integer>
+                <key>subtext</key>
+                <string>Store current tab as bookmark</string>
+                <key>title</key>
+                <string>Store Bookmark</string>
+                <key>type</key>
+                <integer>0</integer>
+                <key>withspace</key>
+                <true/>
+            </dict>
+            <key>type</key>
+            <string>alfred.workflow.input.scriptfilter</string>
+            <key>uid</key>
+            <string>%s</string>
+            <key>version</key>
+            <integer>3</integer>
+        </dict>
+        <dict>
+            <key>config</key>
+            <dict>
                 <key>browser</key>
                 <string>com.google.Chrome</string>
                 <key>spaces</key>
@@ -124,7 +181,7 @@ python3 bookmark_manager.py search "$1"'''
         </dict>
     </array>
     <key>readme</key>
-    <string>Search your Chrome bookmarks with Alfred</string>
+    <string>Search and store Chrome bookmarks with Alfred</string>
     <key>uidata</key>
     <dict>
         <key>%s</key>
@@ -141,13 +198,22 @@ python3 bookmark_manager.py search "$1"'''
             <key>ypos</key>
             <integer>100</integer>
         </dict>
+        <key>%s</key>
+        <dict>
+            <key>xpos</key>
+            <integer>500</integer>
+            <key>ypos</key>
+            <integer>100</integer>
+        </dict>
     </dict>
     <key>version</key>
-    <string>1.0.0</string>
+    <string>1.1.0</string>
     <key>webaddress</key>
     <string>https://github.com/mketkar</string>
 </dict>
-</plist>''' % (script_filter_uid, browser_uid, script_filter_uid, browser_uid, script_filter_uid, browser_uid)
+</plist>''' % (search_filter_uid, browser_uid, store_filter_uid, browser_uid, 
+               search_filter_uid, store_filter_uid, browser_uid,
+               search_filter_uid, store_filter_uid, browser_uid)
     
     with open(os.path.join(build_dir, 'info.plist'), 'w') as f:
         f.write(info_plist_content)

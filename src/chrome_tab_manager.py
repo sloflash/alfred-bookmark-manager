@@ -5,6 +5,7 @@ import os
 import sqlite3
 import json
 import logging
+import time
 from typing import List, Dict, Optional
 from pathlib import Path
 
@@ -13,7 +14,7 @@ class ChromeTabManager:
         self.user_dir = os.path.expanduser('~')
         self.chrome_state_file = os.path.join(
             self.user_dir,
-            'Library/Application Support/Google/Chrome/Default/Sessions/Tabs_*'
+            'Library/Application Support/Google/Chrome/Default/Sessions'
         )
         self.chrome_db = os.path.join(
             self.user_dir,
@@ -27,22 +28,28 @@ class ChromeTabManager:
         try:
             # Create a temporary copy of the History database since Chrome locks it
             temp_db = "/tmp/chrome_history_temp"
+            
+            # Wait for a moment if Chrome is actively writing
+            time.sleep(0.5)
+            
+            # Copy the database with system command
             os.system(f"cp '{self.chrome_db}' '{temp_db}'")
             
             conn = sqlite3.connect(temp_db)
             cursor = conn.cursor()
             
-            # Query for current tabs
+            # Query for the most recently accessed tabs
             cursor.execute("""
                 SELECT urls.url, urls.title 
                 FROM urls 
                 JOIN visits ON urls.id = visits.url 
                 WHERE visits.visit_time > (
-                    SELECT MAX(visit_time) - 86400000000 FROM visits
+                    SELECT MAX(visit_time) - 3600000000 FROM visits
                 )
+                AND urls.title != ''
                 GROUP BY urls.url 
                 ORDER BY MAX(visits.visit_time) DESC 
-                LIMIT 50
+                LIMIT 20
             """)
             
             tabs = []
@@ -56,6 +63,11 @@ class ChromeTabManager:
             
             conn.close()
             os.remove(temp_db)
+            
+            # Log the results for debugging
+            logging.info(f"Found {len(tabs)} open tabs")
+            for tab in tabs:
+                logging.info(f"Tab: {tab['title']} - {tab['url']}")
             
             return tabs
             
