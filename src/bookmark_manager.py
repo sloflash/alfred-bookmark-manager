@@ -6,8 +6,10 @@ import json
 import os
 import sys
 import logging
+import shlex
 from typing import List, Dict, Any, Union
 from urllib.parse import urljoin
+from chrome_tab_manager import ChromeTabManager
 
 # Configure logging
 log_dir = os.path.expanduser('~/Library/Logs/MayankBookmarkManager')
@@ -25,6 +27,7 @@ class BookmarkManager:
     def __init__(self):
         self.user_dir = os.path.expanduser('~')
         self.chrome_path = os.path.join(self.user_dir, CHROME_BOOKMARK_PATH)
+        self.tab_manager = ChromeTabManager()
         logging.info(f"Chrome bookmarks path: {self.chrome_path}")
 
     def get_all_urls(self, the_json: Dict) -> List[Dict[str, str]]:
@@ -117,6 +120,37 @@ class BookmarkManager:
         else:
             return [f"Chrome bookmarks NOT found at: {self.chrome_path}"]
 
+    def create_bookmark(self, url: str, folder_path: str, title: str) -> bool:
+        """
+        Create a new bookmark with the specified folder structure
+        """
+        return self.tab_manager.create_bookmark(url, folder_path, title, self)
+
+    def get_open_tabs(self) -> List[Dict[str, str]]:
+        """
+        Get all open Chrome tabs
+        """
+        return self.tab_manager.get_open_tabs()
+
+def parse_bookmark_command(cmd: str) -> Dict[str, str]:
+    """
+    Parse the bookmark command string
+    Format: bms "url" folder/path "title"
+    """
+    try:
+        parts = shlex.split(cmd)
+        if len(parts) < 4:  # Need at least: bms "url" folder "title"
+            return {}
+        
+        return {
+            'url': parts[1],
+            'folder_path': parts[2],
+            'title': parts[3]
+        }
+    except Exception as e:
+        logging.error(f"Error parsing bookmark command: {e}")
+        return {}
+
 def main():
     action = sys.argv[1] if len(sys.argv) > 1 else None
     
@@ -138,6 +172,40 @@ def main():
                 } for b in bookmarks
             ]
         }))
+    
+    elif action == 'tabs':
+        tabs = bm_manager.get_open_tabs()
+        print(json.dumps({
+            "items": [
+                {
+                    "title": t['title'],
+                    "subtitle": t['url'],
+                    "arg": t['url'],
+                    "text": {
+                        "copy": t['url'],
+                        "largetype": t['title']
+                    }
+                } for t in tabs
+            ]
+        }))
+    
+    elif action == 'create':
+        # Format: bms "url" folder/path "title"
+        cmd = ' '.join(sys.argv[2:])
+        params = parse_bookmark_command(cmd)
+        
+        if params:
+            success = bm_manager.create_bookmark(
+                params['url'],
+                params['folder_path'],
+                params['title']
+            )
+            if success:
+                print(json.dumps({"status": "success"}))
+            else:
+                print(json.dumps({"status": "error"}))
+        else:
+            print(json.dumps({"status": "invalid_command"}))
     
     elif action == 'debug_paths':
         paths = bm_manager.debug_bookmark_paths()
