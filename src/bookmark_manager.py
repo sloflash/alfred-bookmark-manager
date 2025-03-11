@@ -164,13 +164,27 @@ def main():
     # Add debug logging for command line arguments
     logging.info(f"Command line arguments: {sys.argv}")
     
-    action = sys.argv[1] if len(sys.argv) > 1 else None
+    # Check if we're being called from Alfred
+    # Alfred sometimes passes '(null)' as the argument
+    query_from_alfred = None
+    if len(sys.argv) > 1 and sys.argv[1] == '(null)':
+        logging.info("Detected Alfred null argument pattern")
+        # Default to search with no query when called with (null)
+        action = 'search'
+    else:
+        action = sys.argv[1] if len(sys.argv) > 1 else 'search'  # Default to search
+    
     logging.info(f"Action: {action}")
     
     bm_manager = BookmarkManager()
     
     if action == 'search':
-        query = sys.argv[2] if len(sys.argv) > 2 else None
+        # If called from Alfred with (null), use empty query
+        if len(sys.argv) > 1 and sys.argv[1] == '(null)':
+            query = None
+        else:
+            query = sys.argv[2] if len(sys.argv) > 2 else None
+            
         logging.info(f"Search query: {query}")
         bookmarks = bm_manager.search_bookmarks(query)
         logging.info(f"Found {len(bookmarks)} bookmarks")
@@ -206,6 +220,29 @@ def main():
         }))
     
     elif action == 'create':
+        # If called from Alfred with (null), show tabs
+        if len(sys.argv) > 1 and sys.argv[1] == '(null)':
+            logging.info("Alfred null argument, showing open tabs")
+            tabs = bm_manager.get_open_tabs()
+            logging.info(f"Found {len(tabs)} tabs")
+            if not tabs:
+                print(json.dumps({"items": [{"title": "No open tabs found"}]}))
+            else:
+                print(json.dumps({
+                    "items": [
+                        {
+                            "title": t['title'],
+                            "subtitle": t['url'],
+                            "arg": t['url'],
+                            "text": {
+                                "copy": t['url'],
+                                "largetype": t['title']
+                            }
+                        } for t in tabs
+                    ]
+                }))
+            return
+            
         # Get command arguments
         cmd = ' '.join(sys.argv[2:]) if len(sys.argv) > 2 else ''
         logging.info(f"Create command: '{cmd}'")
