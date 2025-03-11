@@ -21,56 +21,63 @@ class ChromeTabManager:
             self.user_dir,
             'Library/Application Support/Google/Chrome/Default/Current Session'
         )
+        self.chrome_tabs_db = os.path.join(
+            self.user_dir,
+            'Library/Application Support/Google/Chrome/Default/History'
+        )
         
     def get_open_tabs(self) -> List[Dict[str, str]]:
         """
-        Get all open Chrome tabs from the current session
+        Get all open Chrome tabs from the current session using SQLite database
         """
         try:
-            # First try to get active tabs from Current Session
-            if os.path.exists(self.chrome_snss_file):
-                # Create a temporary copy since Chrome might lock the file
-                temp_file = "/tmp/chrome_session_temp"
-                os.system(f"cp '{self.chrome_snss_file}' '{temp_file}'")
-                
-                # Read the file in binary mode to find URLs
-                with open(temp_file, 'rb') as f:
-                    content = f.read()
-                os.remove(temp_file)
-                
-                # Extract URLs from binary content
-                tabs = []
-                # Split on http/https and try to extract URLs
-                parts = content.split(b'http')
-                for part in parts[1:]:  # Skip first part before http
-                    try:
-                        # Convert to string and find end of URL
-                        url_part = part.decode('utf-8', errors='ignore')
-                        url_end = url_part.find('\x00')
-                        if url_end > 0:
-                            url = 'http' + url_part[:url_end]
-                            if url.startswith('https://my.1password.com') or url.startswith('http://my.1password.com'):
-                                title = "1Password Sign In"
-                            else:
-                                title = url.split('/')[-1] or url
-                            tabs.append({
-                                'title': title,
-                                'url': url,
-                                'source': 'chrome_tab'
-                            })
-                    except Exception as e:
-                        logging.error(f"Error parsing URL: {e}")
-                        continue
-                
-                # Log the results for debugging
-                logging.info(f"Found {len(tabs)} open tabs")
-                for tab in tabs:
-                    logging.info(f"Tab: {tab['title']} - {tab['url']}")
-                
-                return tabs
+            if not os.path.exists(self.chrome_tabs_db):
+                logging.error(f"Chrome history database not found at: {self.chrome_tabs_db}")
+                return []
+
+            # Create a temporary copy of the database since Chrome might lock it
+            temp_db = "/tmp/chrome_history_temp"
+            os.system(f"cp '{self.chrome_tabs_db}' '{temp_db}'")
             
-            logging.error("No Current Session file found")
-            return []
+            tabs = []
+            try:
+                conn = sqlite3.connect(temp_db)
+                cursor = conn.cursor()
+                
+                # Query for recently accessed tabs (within last hour)
+                cursor.execute("""
+                    SELECT title, url 
+                    FROM urls 
+                    WHERE last_visit_time > ? 
+                    ORDER BY last_visit_time DESC 
+                    LIMIT 20
+                """, (int((time.time() - 3600) * 1000000 + 11644473600000000),))
+                
+                for row in cursor.fetchall():
+                    title, url = row
+                    if url and url.startswith('http'):
+                        tabs.append({
+                            'title': title or url.split('/')[-1] or url,
+                            'url': url,
+                            'source': 'chrome_tab'
+                        })
+                
+                conn.close()
+                
+            except sqlite3.Error as e:
+                logging.error(f"SQLite error: {e}")
+            finally:
+                try:
+                    os.remove(temp_db)
+                except:
+                    pass
+            
+            # Log the results for debugging
+            logging.info(f"Found {len(tabs)} open tabs")
+            for tab in tabs:
+                logging.info(f"Tab: {tab['title']} - {tab['url']}")
+            
+            return tabs
             
         except Exception as e:
             logging.error(f"Error getting open tabs: {e}")
