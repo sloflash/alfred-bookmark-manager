@@ -1,1 +1,6 @@
 # No external dependencies required 
+sqlite3
+typing
+json
+logging
+shlex 

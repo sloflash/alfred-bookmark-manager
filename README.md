@@ -14,7 +14,23 @@ A powerful Alfred workflow to manage Chrome bookmarks and open tabs. This tool a
 
 1. Ensure you have Alfred installed with the Powerpack
 2. Clone this repository
-3. Double click the `.alfredworkflow` file to install
+3. Set up the Python environment
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+4. Create an Alfred workflow:
+   - Open Alfred Preferences
+   - Go to Workflows
+   - Click the '+' button and choose 'Blank Workflow'
+   - Set a name and choose an optional icon
+   - Add a Keyword input with:
+     - Keyword: `bms`
+     - Script: `/path/to/your/python /path/to/alfred_workflow.py tabs`
+   - Add a Keyword input for bookmark creation:
+     - Keyword: `bmc`
+     - Script: `/path/to/your/python /path/to/alfred_workflow.py create {query}`
 
 ## Usage
 
@@ -22,6 +38,7 @@ A powerful Alfred workflow to manage Chrome bookmarks and open tabs. This tool a
 
 - `bm [query]` - Search through your Chrome bookmarks
 - `bms` - View open Chrome tabs
+- `bmc` - Create a new bookmark
 
 ### Creating Bookmarks
 
@@ -29,13 +46,13 @@ You can create bookmarks in two ways:
 
 1. From a URL directly:
    ```
-   bms "www.example.com" folder "Bookmark Title"
+   bmc "www.example.com" folder "Bookmark Title"
    ```
    This creates a bookmark in the specified folder.
 
 2. With nested folders:
    ```
-   bms "www.example.com" folder/subfolder/subsubfolder "Bookmark Title"
+   bmc "www.example.com" folder/subfolder/subsubfolder "Bookmark Title"
    ```
    This creates the folder structure if it doesn't exist and adds the bookmark.
 
@@ -51,7 +68,7 @@ You can create bookmarks in two ways:
    - Press space
    - Type the folder path and title:
      ```
-     folder/path "Bookmark Title"
+     bmc "Bookmark Title"
      ```
 
 ## Requirements
@@ -68,6 +85,12 @@ The workflow uses Chrome's bookmark file and history database to:
 - Read currently open tabs
 - Create folder structures
 - Manage bookmark metadata
+
+## Troubleshooting
+
+- Ensure Python path is correct in Alfred workflow
+- Check logs at `~/Library/Logs/MayankBookmarkManager/bookmark_manager.log`
+- Verify Chrome is running and bookmarks are accessible
 
 ## License
 
