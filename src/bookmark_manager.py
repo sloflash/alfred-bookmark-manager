@@ -9,6 +9,12 @@ import logging
 import shlex
 from typing import List, Dict, Any, Union
 from urllib.parse import urljoin
+
+# Add the current directory to the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
 from chrome_tab_manager import ChromeTabManager
 
 # Configure logging
@@ -19,6 +25,9 @@ logging.basicConfig(
     level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s: %(message)s'
 )
+logging.info("=== Bookmark Manager Started ===")
+logging.info(f"Python version: {sys.version}")
+logging.info(f"Current directory: {os.getcwd()}")
 
 # Chrome bookmark file path relative to HOME
 CHROME_BOOKMARK_PATH = 'Library/Application Support/Google/Chrome/Default/Bookmarks'
@@ -152,13 +161,19 @@ def parse_bookmark_command(cmd: str) -> Dict[str, str]:
         return {}
 
 def main():
+    # Add debug logging for command line arguments
+    logging.info(f"Command line arguments: {sys.argv}")
+    
     action = sys.argv[1] if len(sys.argv) > 1 else None
+    logging.info(f"Action: {action}")
     
     bm_manager = BookmarkManager()
     
     if action == 'search':
         query = sys.argv[2] if len(sys.argv) > 2 else None
+        logging.info(f"Search query: {query}")
         bookmarks = bm_manager.search_bookmarks(query)
+        logging.info(f"Found {len(bookmarks)} bookmarks")
         print(json.dumps({
             "items": [
                 {
@@ -175,6 +190,7 @@ def main():
     
     elif action == 'tabs':
         tabs = bm_manager.get_open_tabs()
+        logging.info(f"Found {len(tabs)} tabs")
         print(json.dumps({
             "items": [
                 {
@@ -192,10 +208,13 @@ def main():
     elif action == 'create':
         # Get command arguments
         cmd = ' '.join(sys.argv[2:]) if len(sys.argv) > 2 else ''
+        logging.info(f"Create command: '{cmd}'")
         
         # If no arguments provided, show open tabs
         if not cmd:
+            logging.info("No command arguments, showing open tabs")
             tabs = bm_manager.get_open_tabs()
+            logging.info(f"Found {len(tabs)} tabs")
             if not tabs:
                 print(json.dumps({"items": [{"title": "No open tabs found"}]}))
             else:
